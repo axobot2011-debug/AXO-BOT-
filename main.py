@@ -1,9 +1,10 @@
 import os
 import requests
 import json
+import re
 from flask import Flask, request
 
-# إلغاء تحذيرات شهادات الـ SSL غير الموثوقة لتجنب مشاكل الاتصال بسيرفر جيزي
+# إلغاء تحذيرات شهادات الـ SSL غير الموثوقة لتجنب مشاكل الاتصال
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -13,40 +14,29 @@ app = Flask(__name__)
 FB_TOKEN = "EAAWmvfe5WngBRifTZBeE3xaYBayhuic05lnkmZA3SpYVZBDG4SVzodCvGZAcxvKBEEx659iUZC6ZAxXZBslKuH6xooPZAnO3ZAEwpwqgw1uiMYningycVaf4j9hQxYRuP3580cT7hsXG6Di3SBjNwFnaQEpiqyOcGYE35ROJPsIuNVtv2H8oGw01X3aNyEbJaoaQBZB20ah2mg3K5a2pxp1gBd0LtsxAZDZD"
 VERIFY_TOKEN = "Yacin"
 
-# الرابط الخاص بجلب قائمة البروكسيات من موقعك
 PROXY_API_URL = 'https://dev-bendjarayacine.pantheonsite.io/wp-admin/maint/proxy.json'
 
 user_states = {}
 
-def get_proxy():
+def get_backup_proxies():
     """
-    تحليل البروكسي ومعالجته بدقة متناهية مطابقة لملف الـ PHP
+    دالة احتياطية ذكية لجلب بروكسيات مجانية وتجربتها تلقائياً في حال فشل البروكسي الخاص بك
     """
+    proxies_found = []
     try:
-        res = requests.get(PROXY_API_URL, timeout=5)
+        # جلب قائمة بروكسيات عامة وسريعة تدعم الـ HTTPS
+        url = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=5000&country=all&ssl=all&anonymity=all"
+        res = requests.get(url, timeout=5)
         if res.status_code == 200:
-            proxies_list = res.json()
-            if proxies_list and len(proxies_list) > 0:
-                # نأخذ البروكسي الأول وننظفه من أي مسافات
-                proxy_str = proxies_list[0].strip()
-                parts = proxy_str.split(':')
-                
-                if len(parts) == 4:
-                    ip, port, user, password = parts
-                    proxy_url = f"http://{user}:{password}@{ip}:{port}"
-                    return {"http": proxy_url, "https": proxy_url}
-                elif len(parts) == 2:
-                    ip, port = parts
-                    proxy_url = f"http://{ip}:{port}"
-                    return {"http": proxy_url, "https": proxy_url}
-    except Exception as e:
-        print(f"[-] Proxy Fetch Error: {e}")
-    return None
+            list_p = res.text.strip().split('\n')
+            for p in list_p:
+                if p.strip():
+                    proxies_found.append(p.strip())
+    except:
+        pass
+    return proxies_found
 
 def send_djezzy_otp(msisdn):
-    """
-    دالة إرسال الرمز مع آلية ذكية لتجربة الاتصال بالبروكسي وبدونه لتفادي الحظر
-    """
     url = "https://apim.djezzy.dz/mobile-api/api/v1/auth/otp"
     payload = f"msisdn={msisdn}"
     
@@ -58,70 +48,72 @@ def send_djezzy_otp(msisdn):
         'Accept-Encoding': 'gzip'
     }
     
-    # محاولة أولى: باستخدام البروكسي المستخرج
-    proxies = get_proxy()
-    if proxies:
-        print(f"[+] Trying to send OTP with proxy: {proxies}")
-        try:
-            response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=8, verify=False)
-            print(f"[+] Proxy Response Status: {response.status_code}")
+    # 1. المحاولة بالبروكسي الخاص بموقعك أولاً
+    try:
+        res = requests.get(PROXY_API_URL, timeout=4)
+        if res.status_code == 200:
+            my_proxy = res.json()[0].strip()
+            parts = my_proxy.split(':')
+            if len(parts) == 4:
+                p_url = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            else:
+                p_url = f"http://{parts[0]}:{parts[1]}"
+            
+            print(f"[+] Trying your site proxy...")
+            response = requests.post(url, data=payload, headers=headers, proxies={"http": p_url, "https": p_url}, timeout=6, verify=False)
             if response.status_code in [200, 201]:
                 return True
-        except Exception as e:
-            print(f"[-] Proxy Attempt Failed: {e}")
+    except:
+        print("[-] Your proxy failed. Launching Auto-Proxy Search...")
+
+    # 2. إذا فشل، البوت سيبحث تلقائياً عن أي بروكسي شغال ويعبر جدار حماية جيزي فوراً
+    backup_list = get_backup_proxies()
+    for proxy in backup_list[:15]: # تجربة أفضل 15 بروكسي متاح
+        try:
+            p_url = f"http://{proxy}"
+            print(f"[+] Trying automated backup proxy: {proxy}")
+            response = requests.post(url, data=payload, headers=headers, proxies={"http": p_url, "https": p_url}, timeout=4, verify=False)
+            if response.status_code in [200, 201]:
+                print(f"[🎉] Found working proxy! OTP Sent.")
+                return True
+        except:
+            continue
             
-    # محاولة ثانية: بدون بروكسي (اتصال مباشر) في حال فشل البروكسي أو عدم توفره
-    print("[+] Trying direct connection without proxy...")
-    try:
-        response = requests.post(url, data=payload, headers=headers, timeout=8, verify=False)
-        print(f"[+] Direct Response Status: {response.status_code}")
-        return response.status_code in [200, 201]
-    except Exception as e:
-        print(f"[-] Direct Attempt Failed: {e}")
-        
     return False
 
 def verify_djezzy_otp(msisdn, otp_code):
-    """
-    التحقق من الرمز مع آلية مزدوجة أيضاً لضمان الاتصال
-    """
     url = "https://apim.djezzy.dz/mobile-api/api/v1/auth/login"
     payload = f"msisdn={msisdn}&otp={otp_code}&grant_type=password"
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': '*/*',
-        'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 6.0; PGN610 Build/MRA58K)',
-        'Connection': 'Keep-Alive',
-        'Accept-Encoding': 'gzip'
+        'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 6.0; PGN610 Build/MRA58K)'
     }
     
-    proxies = get_proxy()
-    # تجربة بالبروكسي
-    if proxies:
+    # المحاولة الأولى عبر الاتصال المباشر والبروكسي الآلي
+    try:
+        response = requests.post(url, data=payload, headers=headers, timeout=6, verify=False)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+        
+    backup_list = get_backup_proxies()
+    for proxy in backup_list[:10]:
         try:
-            response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=8, verify=False)
+            p_url = f"http://{proxy}"
+            response = requests.post(url, data=payload, headers=headers, proxies={"http": p_url, "https": p_url}, timeout=4, verify=False)
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 400:
                 return "wrong_otp"
         except:
-            pass
-            
-    # تجربة بدون بروكسي
-    try:
-        response = requests.post(url, data=payload, headers=headers, timeout=8, verify=False)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 400:
-            return "wrong_otp"
-    except Exception as e:
-        print(f"Error verify: {e}")
+            continue
     return False
 
 @app.route('/webhook', methods=['GET'])
 def facebook_verify():
-    token_sent = request.args.get("hub.verify_token")
-    if token_sent == VERIFY_TOKEN:
+    if request.args.get("hub.verify_token") == VERIFY_TOKEN:
         return request.args.get("hub.challenge", "")
     return "Verification Error"
 
@@ -134,25 +126,22 @@ def facebook_webhook():
                 if "message" in event:
                     sender_id = event["sender"]["id"]
                     user_msg = event["message"].get("text", "").strip()
-                    
                     digits = ''.join(filter(str.isdigit, user_msg))
                     
                     if user_msg == "🎁 تسجيل 2 جيجا" or user_msg.lower() in ["hello", "start"]:
                         user_states[sender_id] = {"state": "WAITING_FOR_PHONE"}
-                        reply = "مرحباً بك في بوت Axo 🤖\nمن فضلك أرسل رقم جيزي الخاص بك (مثال: 07XXXXXXXX) لبدء التفعيل الفوري:"
-                        send_fb_message(sender_id, reply)
+                        send_fb_message(sender_id, "مرحباً بك في بوت Axo 🤖\nمن فضلك أرسل رقم جيزي الخاص بك (07XXXXXXXX) لبدء التفعيل الفوري:")
                         
                     elif user_states.get(sender_id, {}).get("state") == "WAITING_FOR_PHONE":
                         if len(digits) == 10 and digits.startswith("07"):
                             msisdn = "213" + digits[1:]
-                            
-                            send_fb_message(sender_id, f"جاري الاتصال بسيرفرات جيزي لإرسال رمز التحقق إلى الرقم {digits}... ⏳")
+                            send_fb_message(sender_id, f"جاري تجاوز حظر الشبكة والاتصال بسيرفر جيزي للرقم {digits}... ⏳ (قد يستغرق الأمر ثوانٍ)")
                             
                             if send_djezzy_otp(msisdn):
                                 user_states[sender_id] = {"state": "WAITING_FOR_OTP", "msisdn": msisdn, "pure_phone": digits}
-                                reply = "✅ تم إرسال الرمز بنجاح!\nالرجاء إدخال رمز التحقق (OTP) المكون من 6 أرقام الذي وصلك الآن في رسالة نصية قصيرة SMS:"
+                                reply = "✅ تم إرسال الرمز بنجاح!\nالرجاء إدخال رمز التحقق (OTP) المكون من 6 أرقام الذي وصلك في رسالة قصيرة SMS:"
                             else:
-                                reply = "⚠️ فشل الاتصال بسيرفر جيزي. يرجى التأكد من أن الرقم مسجل في جيزي أو المحاولة مرة أخرى بعد دقيقة."
+                                reply = "❌ عذراً، جميع البروكسيات مضغوطة حالياً وسيرفر جيزي يرفض الاتصال الخارجي. أعد إرسال رقمك للمحاولة مرة أخرى."
                                 user_states[sender_id] = None
                         else:
                             reply = "❌ الرقم غير صحيح! يرجى إدخال رقم جيزي صحيح يبدأ بـ 07 ويتكون من 10 أرقام:"
@@ -162,7 +151,6 @@ def facebook_webhook():
                         saved_info = user_states[sender_id]
                         if len(digits) == 6:
                             send_fb_message(sender_id, "🔐 جاري التحقق من الرمز وتفعيل الـ 2 جيجا...")
-                            
                             auth_result = verify_djezzy_otp(saved_info["msisdn"], digits)
                             
                             if auth_result == "wrong_otp":
@@ -171,31 +159,22 @@ def facebook_webhook():
                                 reply = f"🎉 مبروك! تم تفعيل هدية الـ (2 جيجا مجاناً) بنجاح على رقمك {saved_info['pure_phone']} عبر بوت Axo 🤖!"
                                 user_states[sender_id] = None
                             else:
-                                reply = "❌ فشل التفعيل بسبب خطأ في اتصال جيزي، يرجى إعادة إرسال رقمك للمحاولة من جديد."
+                                reply = "❌ انتهت صلاحية الجلسة أو حدث خطأ، يرجى إعادة إرسال رقمك للبدء من جديد."
                                 user_states[sender_id] = None
                         else:
                             reply = "⚠️ يرجى إدخال رمز تحقق صحيح مكون من 6 أرقام:"
                         send_fb_message(sender_id, reply)
-                        
                     else:
-                        reply = "مرحباً بك في بوت أكسو (Axo) لتفعيل عروض الإنترنت 🤖\n\nاضغط على الزر بالأسفل لبدء الاستفادة الفورية 👇"
-                        send_fb_message(sender_id, reply)
+                        send_fb_message(sender_id, "مرحباً بك في بوت أكسو (Axo) لتفعيل عروض الإنترنت 🤖\n\nاضغط على الزر بالأسفل لبدء الاستفادة الفورية 👇")
                         
     return "ok", 200
 
 def send_fb_message(recipient_id, text):
     url = f"https://graph.facebook.com/v17.0/me/messages?access_token={FB_TOKEN}"
-    quick_replies = [
-        {"content_type": "text", "title": "🎁 تسجيل 2 جيجا", "payload": "ACTIVATE"}
-    ]
-    payload = {
-        "recipient": {"id": recipient_id},
-        "message": {"text": text, "quick_replies": quick_replies}
-    }
-    try:
-        requests.post(url, json=payload)
-    except:
-        pass
+    quick_replies = [{"content_type": "text", "title": "🎁 تسجيل 2 جيجا", "payload": "ACTIVATE"}]
+    payload = {"recipient": {"id": recipient_id}, "message": {"text": text, "quick_replies": quick_replies}}
+    try: requests.post(url, json=payload)
+    except: pass
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
