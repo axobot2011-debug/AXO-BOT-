@@ -5,7 +5,8 @@ from flask import Flask, request
 app = Flask(__name__)
 
 # ضع التوكن الخاص بصفحتك هنا مكان العبارة أدناه
-FB_TOKEN = "YOUR_FACEBOOK_PAGE_TOKEN"
+FB_TOKEN = "EAAWmvfe5WngBRifTZBeE3xaYBayhuic05lnkmZA3SpYVZBDG4SVzodCvGZAcxvKBEEx659iUZC6ZAxXZBslKuH6xooPZAnO3ZAEwpwqgw1uiMYningycVaf4j9hQxYRuP3580cT7hsXG6Di3SBjNwFnaQEpiqyOcGYE35ROJPsIuNVtv2H8oGw01X3aNyEbJaoaQBZB20ah2mg3K5a2pxp1gBd0LtsxAZDZD"
+
 VERIFY_TOKEN = "Yacin"
 
 # هذا الرابط مخصص فقط لفيسبوك للتحقق من كلمة السر
