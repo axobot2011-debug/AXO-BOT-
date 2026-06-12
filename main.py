@@ -12,8 +12,15 @@ app = Flask(__name__)
 FB_TOKEN = "EAAWmvfe5WngBRifTZBeE3xaYBayhuic05lnkmZA3SpYVZBDG4SVzodCvGZAcxvKBEEx659iUZC6ZAxXZBslKuH6xooPZAnO3ZAEwpwqgw1uiMYningycVaf4j9hQxYRuP3580cT7hsXG6Di3SBjNwFnaQEpiqyOcGYE35ROJPsIuNVtv2H8oGw01X3aNyEbJaoaQBZB20ah2mg3K5a2pxp1gBd0LtsxAZDZD"
 VERIFY_TOKEN = "Yacin"
 
-# 🌟 ضع البروكسي الجزائري الجديد هنا مباشرة بين القوسين 🌟
-ALGERIAN_PROXY = "105.235.132.88:8080"
+# 🌟 إعدادات البروكسي الجزائري المدفوع الخاص بك (OwlProxy) 🌟
+PROXY_USER_PASS = "yfbemOffW270_custom_zone_DZ_st__city_sid_90145724_time_10:2666441"
+PROXY_SERVER_PORT = "change6.owlproxy.com:7778"
+
+# تجهيز قاموس البروكسيات بالصيغة الصحيحة لمكتبة requests في بايثون
+PROXIES_CONFIG = {
+    "http": f"http://{PROXY_USER_PASS}@{PROXY_SERVER_PORT}",
+    "https": f"http://{PROXY_USER_PASS}@{PROXY_SERVER_PORT}"
+}
 
 user_states = {}
 
@@ -28,13 +35,10 @@ def send_djezzy_otp(msisdn):
         'Accept-Encoding': 'gzip'
     }
     
-    # تجهيز البروكسي المكتوب في الأعلى
-    p_url = f"http://{ALGERIAN_PROXY}"
-    proxies = {"http": p_url, "https": p_url}
-    
     try:
-        print(f"[+] Trying Djezzy OTP using proxy: {ALGERIAN_PROXY}")
-        response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=12, verify=False)
+        print(f"[+] Trying Djezzy OTP using OwlProxy...")
+        # تمرير البروكسيات المدفوعة مباشرة عبر متغير proxies
+        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, timeout=15, verify=False)
         print(f"[+] Djezzy Response Code: {response.status_code}")
         return response.status_code in [200, 201]
     except Exception as e:
@@ -49,10 +53,10 @@ def verify_djezzy_otp(msisdn, otp_code):
         'Accept': '*/*',
         'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 6.0; PGN610 Build/MRA58K)'
     }
-    p_url = f"http://{ALGERIAN_PROXY}"
-    proxies = {"http": p_url, "https": p_url}
+    
     try:
-        response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=12, verify=False)
+        # تمرير البروكسيات المدفوعة مباشرة عبر متغير proxies
+        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, timeout=15, verify=False)
         if response.status_code == 200:
             return response.json()
         elif response.status_code == 400:
@@ -127,4 +131,6 @@ def send_fb_message(recipient_id, text):
     except: pass
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    # تشغيل السيرفر محلياً أو عبر المنصة
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
