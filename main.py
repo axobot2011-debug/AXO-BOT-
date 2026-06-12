@@ -9,7 +9,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 app = Flask(__name__)
 
 # إعدادات فيسبوك الخاصة بك
-FB_TOKEN = "EAAWmvfe5WngBRifTZBeE3xaYBayhuic05lnkmZA3SpYVZBDG4SVzodCvGZAcxvKBEEx659iUZC6ZAxXZBslKuH6xooPZAnO3ZAEwpwqgw1uiMYningycVaf4j9hQxYRuP3580cT7hsXG6Di3SBjNwFnaQEpiqyOcGYE35ROJPsIuNVtv2H8oGw01X3aNyEbJaoaQBZB20ah2mg3K5a2pxp1gBd0LtsxAZDZD"
+FB_TOKEN = "EAAWmvfe5WngBRqZBc1ZCdHZAr7RMNNzW440AxCCfgWdyQ5UI1Qc0blZCIDmssZABhPTP57pz94KBhmqMmXh61AJXbf8Kpt3KRkypBDUlQXlTixhDKUfZCUZBZCZBZAswmm7s5wfZBfxHL25TKZCGSinQP4egVamVPSmxNDfCQEnZBc5WqbZACEsIbnaHXqC4lcxmsUBmYAZB67bcdBWMolJKvNFA2XAUd0ZBxgZDZD"
 VERIFY_TOKEN = "Yacin"
 
 # 🌟 إعدادات البروكسي الجزائري المدفوع الخاص بك (OwlProxy) 🌟
