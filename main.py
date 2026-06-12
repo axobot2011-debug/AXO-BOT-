@@ -1,8 +1,9 @@
 import os
 import requests
 from flask import Flask, request
+from requests.auth import HTTPProxyAuth  # استيراد مكتبة التوثيق المنفصل للبروكسي
 
-# إلغاء تحذيرات شهادات الـ SSL غير الموثوقة لتفادي المشاكل مع السيرفرات
+# إلغاء تحذيرات شهادات الـ SSL غير الموثوقة
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -12,15 +13,19 @@ app = Flask(__name__)
 FB_TOKEN = "EAAWmvfe5WngBRqZBc1ZCdHZAr7RMNNzW440AxCCfgWdyQ5UI1Qc0blZCIDmssZABhPTP57pz94KBhmqMmXh61AJXbf8Kpt3KRkypBDUlQXlTixhDKUfZCUZBZCZBZAswmm7s5wfZBfxHL25TKZCGSinQP4egVamVPSmxNDfCQEnZBc5WqbZACEsIbnaHXqC4lcxmsUBmYAZB67bcdBWMolJKvNFA2XAUd0ZBxgZDZD"
 VERIFY_TOKEN = "Yacin"
 
-# 🌟 إعدادات البروكسي الجزائري المدفوع من صورتك (OwlProxy) 🌟
-PROXY_USER_PASS = "yfbemOffW270_custom_zone_DZ_st__city_sid_90145724_time_10:2666441"
+# 🌟 إعدادات البروكسي منفصلة تماماً لتجنب مشاكل الـ السنتكس 🌟
+PROXY_USER = "yfbemOffW270_custom_zone_DZ_st__city_sid_90145724_time_10"
+PROXY_PASS = "2666441"
 PROXY_SERVER_PORT = "change6.owlproxy.com:7778"
 
-# الصياغة الصحيحة للبروكسي المحمي بكلمة سر في بايثون ليمر الاتصال بأمان
+# رابط السيرفر فقط بدون تشابك الحروف
 PROXIES_CONFIG = {
-    "http": f"http://{PROXY_USER_PASS}@{PROXY_SERVER_PORT}",
-    "https": f"http://{PROXY_USER_PASS}@{PROXY_SERVER_PORT}"
+    "http": f"http://{PROXY_SERVER_PORT}",
+    "https": f"http://{PROXY_SERVER_PORT}"
 }
+
+# تفعيل التوثيق المنفصل للـ Username والـ Password
+proxy_auth = HTTPProxyAuth(PROXY_USER, PROXY_PASS)
 
 user_states = {}
 
@@ -36,9 +41,9 @@ def send_djezzy_otp(msisdn):
     }
     
     try:
-        print("[+] Sending Djezzy OTP request via OwlProxy...")
-        # تمرير البروكسي المدفوع مباشرة عبر параметр proxies
-        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, timeout=15, verify=False)
+        print("[+] Sending Djezzy OTP request via OwlProxy (Auth)...")
+        # تمرير البروكسي مع التوثيق المنفصل auth=proxy_auth
+        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, auth=proxy_auth, timeout=15, verify=False)
         print(f"[+] Djezzy API Response Status: {response.status_code}")
         return response.status_code in [200, 201]
     except Exception as e:
@@ -55,8 +60,8 @@ def verify_djezzy_otp(msisdn, otp_code):
     }
     
     try:
-        # تمرير البروكسي المدفوع للتحقق من الرمز وتفعيل العرض
-        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, timeout=15, verify=False)
+        # تمرير البروكسي مع التوثيق المنفصل auth=proxy_auth
+        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, auth=proxy_auth, timeout=15, verify=False)
         if response.status_code == 200:
             return response.json()
         elif response.status_code == 400:
@@ -131,6 +136,5 @@ def send_fb_message(recipient_id, text):
     except: pass
 
 if __name__ == "__main__":
-    # تهيئة المنفذ الديناميكي لتوافق نظام التشغيل على منصة Render
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
