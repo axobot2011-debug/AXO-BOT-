@@ -2,48 +2,46 @@ import os
 import requests
 from flask import Flask, request
 
-# إلغاء تحذيرات شهادات الـ SSL غير الموثوقة
+# إلغاء تحذيرات شهادات الـ SSL غير الموثوقة لتجنب السقوط
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 app = Flask(__name__)
 
+# إعدادات فيسبوك الخاصة بك
 FB_TOKEN = "EAAWmvfe5WngBRqZBc1ZCdHZAr7RMNNzW440AxCCfgWdyQ5UI1Qc0blZCIDmssZABhPTP57pz94KBhmqMmXh61AJXbf8Kpt3KRkypBDUlQXlTixhDKUfZCUZBZCZBZAswmm7s5wfZBfxHL25TKZCGSinQP4egVamVPSmxNDfCQEnZBc5WqbZACEsIbnaHXqC4lcxmsUBmYAZB67bcdBWMolJKvNFA2XAUd0ZBxgZDZD"
 VERIFY_TOKEN = "Yacin"
-
-# سنحاول الاعتماد على آلية الطلب المباشر المحسن أولاً، ثم نمرر لبروكسي طوارئ مجاني إذا فشل
-EMERGENCY_PROXY = "105.235.132.88:8080" 
 
 user_states = {}
 
 def send_djezzy_otp(msisdn):
+    # استخدام نظام الروابط المباشرة المعدلة بالكامل لمحاكاة التطبيق الرسمي
     url = "https://apim.djezzy.dz/mobile-api/api/v1/auth/otp"
     payload = f"msisdn={msisdn}"
+    
+    # الـ Headers الرسمية والدقيقة للتطبيق لتخطي جدار حماية جيزي (توليد بيئة حقيقية)
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': '*/*',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Redmi 9A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Redmi 9A Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36',
+        'X-Requested-With': 'dz.djezzy.internet',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7,ar;q=0.6',
         'Connection': 'keep-alive'
     }
     
-    # المحاولة الأولى: طلب مباشر مع تعديل الـ User-Agent ليوهم السيرفر أنه هاتف Redmi 9A حقيقي
     try:
-        print("[+] Attempt 1: Direct Request to Djezzy...")
-        response = requests.post(url, data=payload, headers=headers, timeout=10, verify=False)
-        print(f"[+] Direct Response Code: {response.status_code}")
-        if response.status_code in [200, 201]: return True
+        print(f"[+] Sending Djezzy OTP via Bypass Mode for number: {msisdn}")
+        # إرسال الطلب عبر السيرفر مباشرة مع الـ Headers المكثفة والآمنة
+        response = requests.post(url, data=payload, headers=headers, timeout=12, verify=False)
+        print(f"[+] Djezzy API Response Status Code: {response.status_code}")
+        print(f"[+] Server Response Body: {response.text}")
+        
+        if response.status_code in [200, 201]:
+            return True
     except Exception as e:
-        print(f"[-] Direct Request Failed: {e}")
-
-    # المحاولة الثانية: عبر البروكسي الاحتياطي في حال فشل الطلب المباشر
-    try:
-        print("[+] Attempt 2: Trying Emergency Proxy...")
-        proxies = {"http": f"http://{EMERGENCY_PROXY}", "https": f"http://{EMERGENCY_PROXY}"}
-        response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=10, verify=False)
-        print(f"[+] Proxy Response Code: {response.status_code}")
-        if response.status_code in [200, 201]: return True
-    except Exception as e:
-        print(f"[-] Emergency Proxy Failed: {e}")
+        print(f"[-] Advanced Bypass Mode Connection Error: {e}")
         
     return False
 
@@ -52,19 +50,19 @@ def verify_djezzy_otp(msisdn, otp_code):
     payload = f"msisdn={msisdn}&otp={otp_code}&grant_type=password"
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': '*/*',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Redmi 9A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Redmi 9A Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36',
+        'X-Requested-With': 'dz.djezzy.internet'
     }
     
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=10, verify=False)
-        if response.status_code == 200: return response.json()
-    except:
-        try:
-            proxies = {"http": f"http://{EMERGENCY_PROXY}", "https": f"http://{EMERGENCY_PROXY}"}
-            response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=10, verify=False)
-            if response.status_code == 200: return response.json()
-        except: pass
+        response = requests.post(url, data=payload, headers=headers, timeout=12, verify=False)
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 400:
+            return "wrong_otp"
+    except Exception as e:
+        print(f"[-] Verification Request Failed: {e}")
     return False
 
 @app.route('/webhook', methods=['GET'])
@@ -95,9 +93,9 @@ def facebook_webhook():
                             
                             if send_djezzy_otp(msisdn):
                                 user_states[sender_id] = {"state": "WAITING_FOR_OTP", "msisdn": msisdn, "pure_phone": digits}
-                                reply = "✅ تم إرسال الرمز بنجاح!\nالرجاء إدخال رمز التحقق (OTP) المكون من 6 أرقام الذي وصلك في رسالة قصيرة SMS:"
+                                reply = "✅ تم إرسال الرمز بنجاح!\nالرجاء إدخل رمز التحقق (OTP) المكون من 6 أرقام الذي وصلك في رسالة قصيرة SMS:"
                             else:
-                                reply = "❌ فشل الاتصال بسيرفر جيزي. يرجى المحاولة مرة أخرى بعد دقيقة أو التأكد من استقرار البروكسي."
+                                reply = "❌ فشل الاتصال بسيرفر جيزي.\nيرجى التأكد من أن الرقم مسجل في جيزي أو المحاولة مرة أخرى بعد دقيقة."
                                 user_states[sender_id] = None
                         else:
                             reply = "❌ الرقم غير صحيح! يرجى إدخال رقم جيزي صحيح يبدأ بـ 07 ويتكون من 10 أرقام:"
