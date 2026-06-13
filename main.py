@@ -1,7 +1,6 @@
 import os
 import requests
 from flask import Flask, request
-from requests.auth import HTTPProxyAuth  # استيراد مكتبة التوثيق المنفصل للبروكسي
 
 # إلغاء تحذيرات شهادات الـ SSL غير الموثوقة
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -9,23 +8,11 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 app = Flask(__name__)
 
-# إعدادات فيسبوك المحدثة الخاصة بك
 FB_TOKEN = "EAAWmvfe5WngBRqZBc1ZCdHZAr7RMNNzW440AxCCfgWdyQ5UI1Qc0blZCIDmssZABhPTP57pz94KBhmqMmXh61AJXbf8Kpt3KRkypBDUlQXlTixhDKUfZCUZBZCZBZAswmm7s5wfZBfxHL25TKZCGSinQP4egVamVPSmxNDfCQEnZBc5WqbZACEsIbnaHXqC4lcxmsUBmYAZB67bcdBWMolJKvNFA2XAUd0ZBxgZDZD"
 VERIFY_TOKEN = "Yacin"
 
-# 🌟 إعدادات البروكسي منفصلة تماماً لتجنب مشاكل الـ السنتكس 🌟
-PROXY_USER = "yfbemOffW270_custom_zone_DZ_st__city_sid_90145724_time_10"
-PROXY_PASS = "2666441"
-PROXY_SERVER_PORT = "change6.owlproxy.com:7778"
-
-# رابط السيرفر فقط بدون تشابك الحروف
-PROXIES_CONFIG = {
-    "http": f"http://{PROXY_SERVER_PORT}",
-    "https": f"http://{PROXY_SERVER_PORT}"
-}
-
-# تفعيل التوثيق المنفصل للـ Username والـ Password
-proxy_auth = HTTPProxyAuth(PROXY_USER, PROXY_PASS)
+# سنحاول الاعتماد على آلية الطلب المباشر المحسن أولاً، ثم نمرر لبروكسي طوارئ مجاني إذا فشل
+EMERGENCY_PROXY = "105.235.132.88:8080" 
 
 user_states = {}
 
@@ -35,19 +22,29 @@ def send_djezzy_otp(msisdn):
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': '*/*',
-        'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 6.0; PGN610 Build/MRA58K)',
-        'Connection': 'Keep-Alive',
-        'Accept-Encoding': 'gzip'
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Redmi 9A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        'Connection': 'keep-alive'
     }
     
+    # المحاولة الأولى: طلب مباشر مع تعديل الـ User-Agent ليوهم السيرفر أنه هاتف Redmi 9A حقيقي
     try:
-        print("[+] Sending Djezzy OTP request via OwlProxy (Auth)...")
-        # تمرير البروكسي مع التوثيق المنفصل auth=proxy_auth
-        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, auth=proxy_auth, timeout=15, verify=False)
-        print(f"[+] Djezzy API Response Status: {response.status_code}")
-        return response.status_code in [200, 201]
+        print("[+] Attempt 1: Direct Request to Djezzy...")
+        response = requests.post(url, data=payload, headers=headers, timeout=10, verify=False)
+        print(f"[+] Direct Response Code: {response.status_code}")
+        if response.status_code in [200, 201]: return True
     except Exception as e:
-        print(f"[-] Proxy Request Failed: {e}")
+        print(f"[-] Direct Request Failed: {e}")
+
+    # المحاولة الثانية: عبر البروكسي الاحتياطي في حال فشل الطلب المباشر
+    try:
+        print("[+] Attempt 2: Trying Emergency Proxy...")
+        proxies = {"http": f"http://{EMERGENCY_PROXY}", "https": f"http://{EMERGENCY_PROXY}"}
+        response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=10, verify=False)
+        print(f"[+] Proxy Response Code: {response.status_code}")
+        if response.status_code in [200, 201]: return True
+    except Exception as e:
+        print(f"[-] Emergency Proxy Failed: {e}")
+        
     return False
 
 def verify_djezzy_otp(msisdn, otp_code):
@@ -56,18 +53,18 @@ def verify_djezzy_otp(msisdn, otp_code):
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': '*/*',
-        'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 6.0; PGN610 Build/MRA58K)'
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Redmi 9A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
     }
     
     try:
-        # تمرير البروكسي مع التوثيق المنفصل auth=proxy_auth
-        response = requests.post(url, data=payload, headers=headers, proxies=PROXIES_CONFIG, auth=proxy_auth, timeout=15, verify=False)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 400:
-            return "wrong_otp"
-    except Exception as e:
-        print(f"[-] Verify Proxy Request Failed: {e}")
+        response = requests.post(url, data=payload, headers=headers, timeout=10, verify=False)
+        if response.status_code == 200: return response.json()
+    except:
+        try:
+            proxies = {"http": f"http://{EMERGENCY_PROXY}", "https": f"http://{EMERGENCY_PROXY}"}
+            response = requests.post(url, data=payload, headers=headers, proxies=proxies, timeout=10, verify=False)
+            if response.status_code == 200: return response.json()
+        except: pass
     return False
 
 @app.route('/webhook', methods=['GET'])
